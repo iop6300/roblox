@@ -1,6 +1,8 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ContextActionService = game:GetService("ContextActionService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.ObbyConfig)
 local player = Players.LocalPlayer
@@ -11,6 +13,10 @@ local movement = {
 	Left = false,
 	Right = false,
 }
+local cameraYaw = math.pi
+local cameraPitch = math.rad(-12)
+local cameraDistance = 11
+local rotatingCamera = false
 
 local function getHumanoid()
 	local character = player.Character
@@ -30,6 +36,23 @@ local function moveCharacter()
 		direction = direction.Unit
 	end
 	humanoid:Move(direction, true)
+end
+
+local function updateCamera(deltaTime)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	camera.CameraType = Enum.CameraType.Scriptable
+	local focus = root.Position + Vector3.new(0, 2.5, 0)
+	local rotation = CFrame.Angles(0, cameraYaw, 0) * CFrame.Angles(cameraPitch, 0, 0)
+	local targetPosition = focus + rotation:VectorToWorldSpace(Vector3.new(0, 1.2, cameraDistance))
+	local target = CFrame.lookAt(targetPosition, focus)
+	local alpha = 1 - math.exp(-12 * deltaTime)
+	camera.CFrame = camera.CFrame:Lerp(target, alpha)
 end
 
 local function bindFallbackControls()
@@ -58,7 +81,31 @@ local function bindFallbackControls()
 		return Enum.ContextActionResult.Sink
 	end, false, Enum.KeyCode.Space)
 
-	game:GetService("RunService").RenderStepped:Connect(moveCharacter)
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if not processed and input.UserInputType == Enum.UserInputType.MouseButton2 then
+			rotatingCamera = true
+			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton2 then
+			rotatingCamera = false
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if rotatingCamera and input.UserInputType == Enum.UserInputType.MouseMovement then
+			cameraYaw -= input.Delta.X * 0.004
+			cameraPitch = math.clamp(cameraPitch - input.Delta.Y * 0.003, math.rad(-55), math.rad(25))
+		elseif input.UserInputType == Enum.UserInputType.MouseWheel then
+			cameraDistance = math.clamp(cameraDistance - input.Position.Z, 6, 18)
+		end
+	end)
+
+	RunService.RenderStepped:Connect(function(deltaTime)
+		moveCharacter()
+		updateCamera(deltaTime)
+	end)
 	warn("[Sky Jump] PlayerModule이 없어 대체 WASD 조작을 사용합니다.")
 end
 
