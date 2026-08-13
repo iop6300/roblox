@@ -185,7 +185,7 @@ finish.Touched:Connect(function(hit)
 	end
 end)
 
-local lava = makePart("Lava", Vector3.new(90, 2, 310), Vector3.new(0, -2, 135), Config.Colors.Lava, Enum.Material.Neon)
+local lava = makePart("Lava", Vector3.new(90, 2, 310), Vector3.new(0, 1, 135), Config.Colors.Lava, Enum.Material.Neon)
 lava.Touched:Connect(function(hit)
 	local humanoid = hit.Parent and hit.Parent:FindFirstChildOfClass("Humanoid")
 	if humanoid then
