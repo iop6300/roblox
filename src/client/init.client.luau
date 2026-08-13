@@ -1,8 +1,68 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ContextActionService = game:GetService("ContextActionService")
 
 local Config = require(ReplicatedStorage.Shared.ObbyConfig)
 local player = Players.LocalPlayer
+
+local movement = {
+	Forward = false,
+	Backward = false,
+	Left = false,
+	Right = false,
+}
+
+local function getHumanoid()
+	local character = player.Character
+	return character and character:FindFirstChildOfClass("Humanoid")
+end
+
+local function moveCharacter()
+	local humanoid = getHumanoid()
+	if not humanoid then
+		return
+	end
+
+	local x = (movement.Right and 1 or 0) - (movement.Left and 1 or 0)
+	local z = (movement.Backward and 1 or 0) - (movement.Forward and 1 or 0)
+	local direction = Vector3.new(x, 0, z)
+	if direction.Magnitude > 1 then
+		direction = direction.Unit
+	end
+	humanoid:Move(direction, true)
+end
+
+local function bindFallbackControls()
+	local playerScripts = player:WaitForChild("PlayerScripts", 5)
+	if playerScripts and playerScripts:FindFirstChild("PlayerModule") then
+		return
+	end
+
+	local function movementAction(actionName, inputState)
+		movement[actionName] = inputState ~= Enum.UserInputState.End
+		moveCharacter()
+		return Enum.ContextActionResult.Sink
+	end
+
+	ContextActionService:BindAction("Forward", movementAction, false, Enum.KeyCode.W, Enum.KeyCode.Up)
+	ContextActionService:BindAction("Backward", movementAction, false, Enum.KeyCode.S, Enum.KeyCode.Down)
+	ContextActionService:BindAction("Left", movementAction, false, Enum.KeyCode.A, Enum.KeyCode.Left)
+	ContextActionService:BindAction("Right", movementAction, false, Enum.KeyCode.D, Enum.KeyCode.Right)
+	ContextActionService:BindAction("Jump", function(_, inputState)
+		if inputState == Enum.UserInputState.Begin then
+			local humanoid = getHumanoid()
+			if humanoid then
+				humanoid.Jump = true
+			end
+		end
+		return Enum.ContextActionResult.Sink
+	end, false, Enum.KeyCode.Space)
+
+	game:GetService("RunService").RenderStepped:Connect(moveCharacter)
+	warn("[Sky Jump] PlayerModule이 없어 대체 WASD 조작을 사용합니다.")
+end
+
+task.spawn(bindFallbackControls)
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "JumpMapUI"
