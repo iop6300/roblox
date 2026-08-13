@@ -14,6 +14,7 @@ course.Parent = workspace
 
 local checkpoints = {}
 local touchCooldown = {}
+local TOOL_NAME = "SpeedCoil"
 
 local function makePart(name, size, position, color, material)
 	local part = Instance.new("Part")
@@ -71,6 +72,70 @@ local function makeCheckpoint(stage, position)
 	end)
 	return checkpoint
 end
+
+local function setCoilSpeed(player, enabled)
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = if enabled then Config.SpeedCoilWalkSpeed else Config.DefaultWalkSpeed
+	end
+end
+
+local function makeSpeedCoil(player)
+	local tool = Instance.new("Tool")
+	tool.Name = TOOL_NAME
+	tool.ToolTip = "장착하면 이동 속도가 빨라집니다"
+	tool.CanBeDropped = false
+
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(1, 2.5, 1)
+	handle.Color = Config.Colors.Toolbox
+	handle.Material = Enum.Material.Neon
+	handle.CanCollide = false
+	handle.Parent = tool
+
+	tool.Equipped:Connect(function()
+		setCoilSpeed(player, true)
+	end)
+	tool.Unequipped:Connect(function()
+		setCoilSpeed(player, false)
+	end)
+	tool.AncestryChanged:Connect(function(_, parent)
+		if not parent then
+			setCoilSpeed(player, false)
+		end
+	end)
+	return tool
+end
+
+local function giveSpeedCoil(player)
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	local character = player.Character
+	if not backpack then
+		return
+	end
+	if backpack:FindFirstChild(TOOL_NAME) or (character and character:FindFirstChild(TOOL_NAME)) then
+		return
+	end
+	makeSpeedCoil(player).Parent = backpack
+end
+
+local toolbox = makePart("Toolbox", Vector3.new(6, 4, 5), Vector3.new(10, 8.5, 0), Config.Colors.Toolbox, Enum.Material.Metal)
+local prompt = Instance.new("ProximityPrompt")
+prompt.Name = "OpenToolbox"
+prompt.ActionText = "열기"
+prompt.ObjectText = "속도 코일 상자"
+prompt.KeyboardKeyCode = Enum.KeyCode.E
+prompt.HoldDuration = 0.25
+prompt.MaxActivationDistance = 10
+prompt.Parent = toolbox
+prompt.Triggered:Connect(function(player)
+	if player:GetAttribute("HasSpeedCoil") then
+		return
+	end
+	player:SetAttribute("HasSpeedCoil", true)
+	giveSpeedCoil(player)
+end)
 
 makeCheckpoint(1, Vector3.new(0, 6, 0))
 
@@ -148,5 +213,9 @@ Players.PlayerAdded:Connect(function(player)
 
 	player.CharacterAdded:Connect(function(character)
 		moveToCheckpoint(player, character)
+		setCoilSpeed(player, false)
+		if player:GetAttribute("HasSpeedCoil") then
+			task.defer(giveSpeedCoil, player)
+		end
 	end)
 end)

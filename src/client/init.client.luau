@@ -17,6 +17,7 @@ local cameraYaw = math.pi
 local cameraPitch = math.rad(-12)
 local cameraDistance = 11
 local rotatingCamera = false
+local extraJumpUsed = false
 
 local function getHumanoid()
 	local character = player.Character
@@ -36,6 +37,44 @@ local function moveCharacter()
 		direction = direction.Unit
 	end
 	humanoid:Move(direction, true)
+end
+
+local function requestJump()
+	local humanoid = getHumanoid()
+	if not humanoid then
+		return
+	end
+
+	if humanoid.FloorMaterial ~= Enum.Material.Air then
+		extraJumpUsed = false
+		humanoid.Jump = true
+	elseif not extraJumpUsed then
+		extraJumpUsed = true
+		local root = humanoid.RootPart
+		if root then
+			root.AssemblyLinearVelocity = Vector3.new(
+				root.AssemblyLinearVelocity.X,
+				Config.DoubleJumpForce,
+				root.AssemblyLinearVelocity.Z
+			)
+		end
+		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+	end
+end
+
+local function watchCharacter(character)
+	extraJumpUsed = false
+	local humanoid = character:WaitForChild("Humanoid")
+	humanoid.StateChanged:Connect(function(_, newState)
+		if newState == Enum.HumanoidStateType.Landed or newState == Enum.HumanoidStateType.Running then
+			extraJumpUsed = false
+		end
+	end)
+end
+
+player.CharacterAdded:Connect(watchCharacter)
+if player.Character then
+	task.spawn(watchCharacter, player.Character)
 end
 
 local function updateCamera(deltaTime)
@@ -73,10 +112,7 @@ local function bindFallbackControls()
 	ContextActionService:BindAction("Right", movementAction, false, Enum.KeyCode.D, Enum.KeyCode.Right)
 	ContextActionService:BindAction("Jump", function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then
-			local humanoid = getHumanoid()
-			if humanoid then
-				humanoid.Jump = true
-			end
+			requestJump()
 		end
 		return Enum.ContextActionResult.Sink
 	end, false, Enum.KeyCode.Space)
